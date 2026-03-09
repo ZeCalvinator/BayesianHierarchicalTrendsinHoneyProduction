@@ -2,15 +2,19 @@
 
 
 
-This project analyzes *state-level trends in honey production across the United States* using data from the USDA Honey Bee Survey. The objective is to examine how honey production per hive changes over time and evaluate potential environmental and biological factors that may influence these trends.
+This project analyzes state-level trends in honey production across the United States using data from the USDA Honey Bee Survey. The objective is to examine how honey production per hive changes over time and evaluate potential environmental and biological factors that may influence these trends.
 
 ## Project Overview
 
 Honey bees are essential for agricultural pollination and ecosystem stability. In recent years, bee populations have faced several stressors including pests, disease, pesticide exposure, and environmental changes. Understanding how these factors relate to honey production can provide insight into broader patterns in bee health and agricultural productivity.
 
-This project applies *Bayesian hierarchical modeling* to examine variation in honey production across states and years while accounting for differences among states.
+This project applies Bayesian hierarchical modeling to examine variation in honey production across states and years while accounting for differences among states.
 
 ## Data
+
+The full dataset is avaible in *honey_bee_state.csv*
+
+
 
 The primary dataset comes from the *USDA Honey Bee Survey*, which reports annual state-level estimates of honey production and colony health indicators.
 
@@ -26,9 +30,13 @@ Variables analyzed include:
 * Annual precipitation
 * State identifiers
 
-Each observation represents a *state–year combination*.
+Each observation represents a state–year combination.
 
 ## Methods
+
+The code for setting up and running each model can be found in *Honey Jags 2.Rmd*
+
+The final model object is saved in *Only_Inter.rds*
 
 The analysis was conducted in *R* using a Bayesian hierarchical modeling framework implemented in *JAGS*.
 
