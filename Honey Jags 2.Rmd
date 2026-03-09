@@ -1,0 +1,1176 @@
+---
+title: "Honey Jags 2"
+author: "Calvin Fertig III"
+date: "2026-02-9"
+output: pdf_document
+---
+
+
+
+```{r, warning = FALSE}
+library(rjags)
+library(jagsUI)
+library(ggmcmc)
+df <- read.csv("honey_bee_state.csv")
+colnames(df)
+
+df$Year  <- as.numeric(scale(df$Year))
+df$VARROAMITES <- as.numeric(scale(df$VARROAMITES))
+df$PESTICIDES  <- as.numeric(scale(df$PESTICIDES))
+df$TemperatureC <- as.numeric(scale(df$TemperatureC))
+df$Percipitation.Inches <- as.numeric(scale(df$Percipitation.Inches))
+df$DISEASE <- as.numeric(scale(df$DISEASE))
+source("sampleHDI.R")
+df$state_id <- as.numeric(factor(df$State))
+```
+
+
+
+
+# Slope and Intercept Heir, all other not
+
+
+
+```{r}
+mod_hier_both <- "
+model {
+
+  # Likelihood
+  for (n in 1:N) {
+    Y[n] ~ dnorm(mu[n], tau_y)
+    mu[n] <- beta0[state[n]] + beta1[state[n]] * Year[n] + beta2*Mites[n] + beta3*Pesti[n] + beta4*Temp[n] + beta5*Perc[n]
+  }
+
+  # State intercepts and slopes
+  for (s in 1:S) {
+    beta0[s] ~ dnorm(mu_beta0, tau_beta0)
+    beta1[s] ~ dnorm(mu_beta1, tau_beta1)
+  }
+
+  # Other Data Points
+  beta2 ~ dnorm(0, 0.001)
+  beta3 ~ dnorm(0, 0.001)
+  beta4 ~ dnorm(0, 0.001)
+  beta5 ~ dnorm(0, 0.001)
+  
+  
+  # Hyperpriors
+  mu_beta0 ~ dnorm(0, 0.001)
+  sigma_beta0 ~ dunif(0, 50)
+  tau_beta0 <- pow(sigma_beta0, -2)
+
+  mu_beta1 ~ dnorm(0, 0.001)
+  sigma_beta1 ~ dunif(0, 50)
+  tau_beta1 <- pow(sigma_beta1, -2)
+
+
+  sigma_y ~ dunif(0, 100)
+  tau_y <- pow(sigma_y, -2)
+
+}
+"
+params <- c(
+  "beta0",      # state intercepts
+  "beta1",      # state slopes
+  "mu_beta1",   # mean slope
+  "sigma_beta1",
+  "sigma_y",
+  "beta2",
+  "beta3",
+  "beta4",
+  "beta5"
+)
+
+inits <- NULL
+
+jags_data <- list(
+  Y     = df$HpH,
+  Year  = df$Year,      
+  state = df$state_id,
+  N     = nrow(df),
+  S     = length(unique(df$state_id)),
+  Mites = df$VARROAMITES,
+  Pesti = df$PESTICIDES,
+  Temp  = df$TemperatureC,
+  Perc  = df$Percipitation.Inches
+)
+
+Full_Fitted_Model_Hier_STSL_Only_No_Inter <- jags(
+  data = jags_data,
+  inits = inits,
+  parameters.to.save = params,
+  model.file = textConnection(mod_hier_both),
+  n.chains = 3, n.adapt = 5000,
+  n.iter = 101000,
+  n.burnin = 1000, n.thin = 10,
+  parallel = FALSE, DIC = TRUE
+)
+```
+
+
+
+
+
+```{r}
+Full_Fitted_Model_Hier_STSL_Only_No_Inter
+
+traceplot(Full_Fitted_Model_Hier_STSL_Only_No_Inter)
+par(mfrow=c(3,3))
+autocorr.plot(Full_Fitted_Model_Hier_STSL_Only_No_Inter$samples,lag.max=40,auto.layout=FALSE,ask=FALSE)
+```
+
+## No intercept heir, slope hier, no other
+
+```{r}
+mod_hier_both <- "
+model {
+
+  # Likelihood
+  for (n in 1:N) {
+    Y[n] ~ dnorm(mu[n], tau_y)
+    mu[n] <- beta0 + beta1[state[n]] * Year[n] + beta2*Mites[n] + beta3*Pesti[n] + beta4*Temp[n] + beta5*Perc[n]
+  }
+
+  # State intercepts and slopes
+  for (s in 1:S) {
+    beta1[s] ~ dnorm(mu_beta1, tau_beta1)
+  }
+
+  # Other Data Points
+  beta0 ~ dnorm(0, 0.001)
+  beta2 ~ dnorm(0, 0.001)
+  beta3 ~ dnorm(0, 0.001)
+  beta4 ~ dnorm(0, 0.001)
+  beta5 ~ dnorm(0, 0.001)
+  
+  
+  # Hyperpriors
+  mu_beta0 ~ dnorm(0, 0.001)
+  sigma_beta0 ~ dunif(0, 50)
+  tau_beta0 <- pow(sigma_beta0, -2)
+
+  mu_beta1 ~ dnorm(0, 0.001)
+  sigma_beta1 ~ dunif(0, 50)
+  tau_beta1 <- pow(sigma_beta1, -2)
+
+
+  sigma_y ~ dunif(0, 100)
+  tau_y <- pow(sigma_y, -2)
+
+}
+"
+params <- c(
+  "beta0",      # intercept
+  "beta1",      # state slopes
+  "mu_beta1",   # mean slope
+  "sigma_beta1",
+  "sigma_y",
+  "beta2",
+  "beta3",
+  "beta4",
+  "beta5"
+)
+
+inits <- NULL
+
+jags_data <- list(
+  Y     = df$HpH,
+  Year  = df$Year,      
+  state = df$state_id,
+  N     = nrow(df),
+  S     = length(unique(df$state_id)),
+  Mites = df$VARROAMITES,
+  Pesti = df$PESTICIDES,
+  Temp  = df$TemperatureC,
+  Perc  = df$Percipitation.Inches
+)
+
+Full_Fitted_Model_Hier_SL_Only_No_Inter <- jags(
+  data = jags_data,
+  inits = inits,
+  parameters.to.save = params,
+  model.file = textConnection(mod_hier_both),
+  n.chains = 3, n.adapt = 5000,
+  n.iter = 101000,
+  n.burnin = 1000, n.thin = 10,
+  parallel = FALSE, DIC = TRUE
+)
+```
+
+
+```{r}
+Full_Fitted_Model_Hier_SL_Only_No_Inter
+```
+
+
+
+```{r}
+traceplot(Full_Fitted_Model_Hier_SL_Only_No_Inter)
+par(mfrow=c(3,3))
+autocorr.plot(Full_Fitted_Model_Hier_SL_Only_No_Inter$samples,lag.max=40,auto.layout=FALSE,ask=FALSE)
+```
+
+
+
+
+
+
+# slope and intercept heir, none other, but with interaction 
+
+
+```{r}
+mod_hier_both <- "
+model {
+
+  # Likelihood
+  for (n in 1:N) {
+    Y[n] ~ dnorm(mu[n], tau_y)
+    mu[n] <- beta0[state[n]] + beta1[state[n]] * Year[n] + beta2*Mites[n] + beta3*Pesti[n] + beta4*Temp[n] + beta5*Perc[n] +             
+         beta6*Mites[n]*Pesti[n] +
+         beta7*Mites[n]*Temp[n] +
+         beta8*Mites[n]*Perc[n] +
+         beta9*Pesti[n]*Temp[n] +
+         beta10*Pesti[n]*Perc[n] +
+         beta11*Temp[n]*Perc[n]
+  }
+
+  # State intercepts and slopes
+  for (s in 1:S) {
+    beta0[s] ~ dnorm(mu_beta0, tau_beta0)
+    beta1[s] ~ dnorm(mu_beta1, tau_beta1)
+  }
+
+  # Other Data Points
+  beta2 ~ dnorm(0, 0.001)
+  beta3 ~ dnorm(0, 0.001)
+  beta4 ~ dnorm(0, 0.001)
+  beta5 ~ dnorm(0, 0.001)
+  beta6  ~ dnorm(0, 0.001)
+  beta7  ~ dnorm(0, 0.001)
+  beta8  ~ dnorm(0, 0.001)
+  beta9  ~ dnorm(0, 0.001)
+  beta10 ~ dnorm(0, 0.001)
+  beta11 ~ dnorm(0, 0.001)
+  
+  # Hyperpriors
+  mu_beta0 ~ dnorm(0, 0.001)
+  sigma_beta0 ~ dunif(0, 50)
+  tau_beta0 <- pow(sigma_beta0, -2)
+
+  mu_beta1 ~ dnorm(0, 0.001)
+  sigma_beta1 ~ dunif(0, 50)
+  tau_beta1 <- pow(sigma_beta1, -2)
+
+
+  sigma_y ~ dunif(0, 100)
+  tau_y <- pow(sigma_y, -2)
+
+}
+"
+params <- c(
+  "beta0",      # state intercepts
+  "beta1",      # state slopes
+  "mu_beta1",   # mean slope
+  "sigma_beta1",
+  "sigma_y",
+  "beta2",
+  "beta3",
+  "beta4",
+  "beta5",
+  "beta6",
+  "beta7",
+  "beta8",
+  "beta9",
+  "beta10",
+  "beta11"
+)
+
+inits <- NULL
+
+jags_data <- list(
+  Y     = df$HpH,
+  Year  = df$Year,      
+  state = df$state_id,
+  N     = nrow(df),
+  S     = length(unique(df$state_id)),
+  Mites = df$VARROAMITES,
+  Pesti = df$PESTICIDES,
+  Temp  = df$TemperatureC,
+  Perc  = df$Percipitation.Inches
+)
+
+Full_Fitted_Model_Hier_STSL_Only_with_Inter <- jags(
+  data = jags_data,
+  inits = inits,
+  parameters.to.save = params,
+  model.file = textConnection(mod_hier_both),
+  n.chains = 3, n.adapt = 5000,
+  n.iter = 101000,
+  n.burnin = 1000, n.thin = 10,
+  parallel = FALSE, DIC = TRUE
+)
+```
+
+```{r}
+Full_Fitted_Model_Hier_STSL_Only_with_Inter
+```
+
+
+
+
+
+
+```{r}
+traceplot(Full_Fitted_Model_Hier_STSL_Only_with_Inter)
+par(mfrow=c(3,3))
+autocorr.plot(Full_Fitted_Model_Hier_STSL_Only_with_Inter$samples,lag.max=40,auto.layout=FALSE,ask=FALSE)
+```
+
+
+
+# Full Model, Hier on slope and intercept, ALL interactions
+
+```{r}
+
+mod_hier_both <- "
+model {
+
+  # Likelihood
+  for (n in 1:N) {
+
+    Y[n] ~ dnorm(mu[n], tau_y)
+
+    mu[n] <- beta0[state[n]] +
+             beta1[state[n]] * Year[n] +
+
+             # Main effects
+             beta[2]  * Mites[n] +
+             beta[3]  * Pesti[n] +
+             beta[4]  * Temp[n]  +
+             beta[5]  * Perc[n]  +
+
+             # Two-way
+             beta[6]  * Mites[n] * Pesti[n] +
+             beta[7]  * Mites[n] * Temp[n]  +
+             beta[8]  * Mites[n] * Perc[n]  +
+             beta[9]  * Pesti[n] * Temp[n]  +
+             beta[10] * Pesti[n] * Perc[n]  +
+             beta[11] * Temp[n]  * Perc[n]  +
+
+             # Three-way
+             beta[12] * Mites[n] * Pesti[n] * Temp[n] +
+             beta[13] * Mites[n] * Pesti[n] * Perc[n] +
+             beta[14] * Mites[n] * Temp[n]  * Perc[n] +
+             beta[15] * Pesti[n] * Temp[n]  * Perc[n] +
+
+             # Four-way
+             beta[16] * Mites[n] * Pesti[n] * Temp[n] * Perc[n]
+  }
+
+  # State intercepts and slopes
+  for (s in 1:S) {
+    beta0[s] ~ dnorm(mu_beta0, tau_beta0)
+    beta1[s] ~ dnorm(mu_beta1, tau_beta1)
+  }
+
+  # Priors 
+  for (k in 2:16) {
+    beta[k] ~ dnorm(0, 0.001)
+  }
+
+  # Hyperpriors
+  mu_beta0 ~ dnorm(0, 0.001)
+  sigma_beta0 ~ dunif(0, 50)
+  tau_beta0 <- pow(sigma_beta0, -2)
+
+  mu_beta1 ~ dnorm(0, 0.001)
+  sigma_beta1 ~ dunif(0, 50)
+  tau_beta1 <- pow(sigma_beta1, -2)
+
+  sigma_y ~ dunif(0, 100)
+  tau_y <- pow(sigma_y, -2)
+
+}
+"
+
+params <- c(
+  "beta0",
+  "beta1",
+  "mu_beta0",
+  "sigma_beta0",
+  "mu_beta1",
+  "sigma_beta1",
+  "sigma_y",
+  "beta"
+)
+
+inits <- NULL
+
+jags_data <- list(
+  Y     = df$HpH,
+  Year  = df$Year,
+  state = df$state_id,
+  N     = nrow(df),
+  S     = length(unique(df$state_id)),
+  Mites = df$VARROAMITES,
+  Pesti = df$PESTICIDES,
+  Temp  = df$TemperatureC,
+  Perc  = df$Percipitation.Inches
+)
+
+Full_Fitted_Model_Hier_STSL_All_Interactions <- jags(
+  data = jags_data,
+  inits = inits,
+  parameters.to.save = params,
+  model.file = textConnection(mod_hier_both),
+  n.chains = 3,
+  n.adapt = 5000,
+  n.iter = 101000,
+  n.burnin = 1000,
+  n.thin = 10,
+  parallel = FALSE,
+  DIC = TRUE
+)
+
+```
+
+```{r}
+Full_Fitted_Model_Hier_STSL_All_Interactions
+```
+
+
+
+
+```{r}
+traceplot(Full_Fitted_Model_Hier_STSL_All_Interactions)
+par(mfrow=c(3,3))
+autocorr.plot(Full_Fitted_Model_Hier_STSL_All_Interactions$samples,lag.max=40,auto.layout=FALSE,ask=FALSE)
+```
+
+
+
+# Heiracrhy only slope, but with Full interactions
+
+
+```{r}
+mod_hier_slope_only <- "
+model {
+
+  # Likelihood
+  for (n in 1:N) {
+
+    Y[n] ~ dnorm(mu[n], tau_y)
+
+    mu[n] <- beta0 +
+             beta1[state[n]] * Year[n] +
+
+             # Main effects
+             beta[2]  * Mites[n] +
+             beta[3]  * Pesti[n] +
+             beta[4]  * Temp[n]  +
+             beta[5]  * Perc[n]  +
+
+             # Two-way interactions
+             beta[6]  * Mites[n] * Pesti[n] +
+             beta[7]  * Mites[n] * Temp[n]  +
+             beta[8]  * Mites[n] * Perc[n]  +
+             beta[9]  * Pesti[n] * Temp[n]  +
+             beta[10] * Pesti[n] * Perc[n]  +
+             beta[11] * Temp[n]  * Perc[n]  +
+
+             # Three-way interactions
+             beta[12] * Mites[n] * Pesti[n] * Temp[n] +
+             beta[13] * Mites[n] * Pesti[n] * Perc[n] +
+             beta[14] * Mites[n] * Temp[n]  * Perc[n] +
+             beta[15] * Pesti[n] * Temp[n]  * Perc[n] +
+
+             # Four-way interaction
+             beta[16] * Mites[n] * Pesti[n] * Temp[n] * Perc[n]
+  }
+
+  # Global intercept
+  beta0 ~ dnorm(0, 0.001)
+
+  # Hierarchical slope for Year
+  for (s in 1:S) {
+    beta1[s] ~ dnorm(mu_beta1, tau_beta1)
+  }
+
+  # Priors 
+  for (k in 2:16) {
+    beta[k] ~ dnorm(0, 0.001)
+  }
+
+  # Hyperpriors for slope hierarchy
+  mu_beta1 ~ dnorm(0, 0.001)
+  sigma_beta1 ~ dunif(0, 50)
+  tau_beta1 <- pow(sigma_beta1, -2)
+
+  # Residual variance
+  sigma_y ~ dunif(0, 100)
+  tau_y <- pow(sigma_y, -2)
+
+}
+"
+
+params <- c(
+  "beta0",
+  "beta1",
+  "mu_beta1",
+  "sigma_beta1",
+  "beta",
+  "sigma_y"
+)
+
+inits <- NULL
+
+jags_data <- list(
+  Y     = df$HpH,
+  Year  = df$Year,
+  state = df$state_id,
+  N     = nrow(df),
+  S     = length(unique(df$state_id)),
+  Mites = df$VARROAMITES,
+  Pesti = df$PESTICIDES,
+  Temp  = df$TemperatureC,
+  Perc  = df$Percipitation.Inches
+)
+
+Full_Fitted_Model_Hier_Slope_Only <- jags(
+  data = jags_data,
+  inits = inits,
+  parameters.to.save = params,
+  model.file = textConnection(mod_hier_slope_only),
+  n.chains = 3,
+  n.adapt = 5000,
+  n.iter = 101000,
+  n.burnin = 1000,
+  n.thin = 10,
+  parallel = FALSE,
+  DIC = TRUE
+)
+
+```
+
+
+```{r}
+Full_Fitted_Model_Hier_Slope_Only
+```
+
+
+
+
+
+
+
+```{r}
+traceplot(Full_Fitted_Model_Hier_Slope_Only)
+par(mfrow=c(3,3))
+autocorr.plot(Full_Fitted_Model_Hier_Slope_Only$samples,lag.max=40,auto.layout=FALSE,ask=FALSE)
+```
+
+
+
+
+
+
+# Slope and inter hierachy, no interactions but a few disease added.
+
+
+
+```{r}
+mod_hier_both <- "
+model {
+
+  # Likelihood
+  for (n in 1:N) {
+    Y[n] ~ dnorm(mu[n], tau_y)
+    mu[n] <- beta0[state[n]] + beta1[state[n]] * Year[n] + beta2*Mites[n] + beta3*Pesti[n] + beta4*Temp[n] + beta5*Perc[n] + beta6*Di[n]
+  }
+
+  # State intercepts and slopes
+  for (s in 1:S) {
+    beta0[s] ~ dnorm(mu_beta0, tau_beta0)
+    beta1[s] ~ dnorm(mu_beta1, tau_beta1)
+  }
+
+  # Other Data Points
+  beta2 ~ dnorm(0, 0.001)
+  beta3 ~ dnorm(0, 0.001)
+  beta4 ~ dnorm(0, 0.001)
+  beta5 ~ dnorm(0, 0.001)
+  beta6 ~ dnorm(0, 0.001) 
+  
+  # Hyperpriors
+  mu_beta0 ~ dnorm(0, 0.001)
+  sigma_beta0 ~ dunif(0, 50)
+  tau_beta0 <- pow(sigma_beta0, -2)
+
+  mu_beta1 ~ dnorm(0, 0.001)
+  sigma_beta1 ~ dunif(0, 50)
+  tau_beta1 <- pow(sigma_beta1, -2)
+
+
+  sigma_y ~ dunif(0, 100)
+  tau_y <- pow(sigma_y, -2)
+
+}
+"
+params <- c(
+  "beta0",      # state intercepts
+  "beta1",      # state slopes
+  "mu_beta1",   # mean slope
+  "sigma_beta1",
+  "sigma_y",
+  "beta2",
+  "beta3",
+  "beta4",
+  "beta5",
+  "beta6"
+)
+
+inits <- NULL
+
+jags_data <- list(
+  Y     = df$HpH,
+  Year  = df$Year,      
+  state = df$state_id,
+  N     = nrow(df),
+  S     = length(unique(df$state_id)),
+  Mites = df$VARROAMITES,
+  Pesti = df$PESTICIDES,
+  Temp  = df$TemperatureC,
+  Perc  = df$Percipitation.Inches,
+  Di    = df$DISEASE
+)
+
+Full_Fitted_Model_Hier_STSL_Only_No_Inter_and_DISEASE <- jags(
+  data = jags_data,
+  inits = inits,
+  parameters.to.save = params,
+  model.file = textConnection(mod_hier_both),
+  n.chains = 3, n.adapt = 5000,
+  n.iter = 101000,
+  n.burnin = 1000, n.thin = 10,
+  parallel = FALSE, DIC = TRUE
+)
+```
+
+
+```{r}
+Full_Fitted_Model_Hier_STSL_Only_No_Inter_and_DISEASE
+```
+
+
+
+
+
+
+
+```{r}
+traceplot(Full_Fitted_Model_Hier_STSL_Only_No_Inter_and_DISEASE)
+par(mfrow=c(3,3))
+autocorr.plot(Full_Fitted_Model_Hier_STSL_Only_No_Inter_and_DISEASE$samples,lag.max=40,auto.layout=FALSE,ask=FALSE)
+```
+
+
+
+
+
+
+
+# Heirarchy on all variables, no interaction.
+
+
+
+
+
+```{r}
+mod_hier_all <- "
+model {
+
+  # Likelihood
+  for (n in 1:N) {
+    Y[n] ~ dnorm(mu[n], tau_y)
+
+    mu[n] <- beta0[state[n]] +
+             beta1[state[n]] * Year[n] +
+             beta2[state[n]] * Mites[n] +
+             beta3[state[n]] * Pesti[n] +
+             beta4[state[n]] * Temp[n] +
+             beta5[state[n]] * Perc[n]
+  }
+
+  # State-level coefficients
+  for (s in 1:S) {
+
+    beta0[s] ~ dnorm(mu_beta0, tau_beta0)
+    beta1[s] ~ dnorm(mu_beta1, tau_beta1)
+    beta2[s] ~ dnorm(mu_beta2, tau_beta2)
+    beta3[s] ~ dnorm(mu_beta3, tau_beta3)
+    beta4[s] ~ dnorm(mu_beta4, tau_beta4)
+    beta5[s] ~ dnorm(mu_beta5, tau_beta5)
+  }
+
+  # Hyperpriors
+  mu_beta0 ~ dnorm(0, 0.001)
+  sigma_beta0 ~ dunif(0, 50)
+  tau_beta0 <- pow(sigma_beta0, -2)
+
+  mu_beta1 ~ dnorm(0, 0.001)
+  sigma_beta1 ~ dunif(0, 50)
+  tau_beta1 <- pow(sigma_beta1, -2)
+
+  mu_beta2 ~ dnorm(0, 0.001)
+  sigma_beta2 ~ dunif(0, 50)
+  tau_beta2 <- pow(sigma_beta2, -2)
+
+  mu_beta3 ~ dnorm(0, 0.001)
+  sigma_beta3 ~ dunif(0, 50)
+  tau_beta3 <- pow(sigma_beta3, -2)
+
+  mu_beta4 ~ dnorm(0, 0.001)
+  sigma_beta4 ~ dunif(0, 50)
+  tau_beta4 <- pow(sigma_beta4, -2)
+
+  mu_beta5 ~ dnorm(0, 0.001)
+  sigma_beta5 ~ dunif(0, 50)
+  tau_beta5 <- pow(sigma_beta5, -2)
+
+  sigma_y ~ dunif(0, 100)
+  tau_y <- pow(sigma_y, -2)
+}
+"
+
+
+params <- c(
+  "beta0","beta1","beta2","beta3","beta4","beta5",
+  "mu_beta0","mu_beta1","mu_beta2","mu_beta3","mu_beta4","mu_beta5",
+  "sigma_beta0","sigma_beta1","sigma_beta2","sigma_beta3","sigma_beta4","sigma_beta5",
+  "sigma_y"
+)
+
+
+jags_data <- list(
+  Y     = df$HpH,
+  Year  = df$Year,
+  state = df$state_id,
+  N     = nrow(df),
+  S     = length(unique(df$state_id)),
+  Mites = df$VARROAMITES,
+  Pesti = df$PESTICIDES,
+  Temp  = df$TemperatureC,
+  Perc  = df$Percipitation.Inches
+)
+
+Full_Fitted_Model_Hier_All <- jags(
+  data = jags_data,
+  inits = NULL,
+  parameters.to.save = params,
+  model.file = textConnection(mod_hier_all),
+  n.chains = 3,
+  n.adapt = 5000,
+  n.iter = 101000,
+  n.burnin = 1000,
+  n.thin = 10,
+  parallel = FALSE,
+  DIC = TRUE
+)
+```
+
+
+
+```{r}
+Full_Fitted_Model_Hier_All
+```
+
+
+
+```{r}
+traceplot(Full_Fitted_Model_Hier_All)
+par(mfrow=c(3,3))
+#autocorr.plot(Full_Fitted_Model_Hier_All$samples,lag.max=40,auto.layout=FALSE,ask=FALSE)
+```
+
+
+# No other predictors
+
+```{r}
+mod_hier_both <- "
+model {
+
+  # Likelihood
+  for (n in 1:N) {
+    Y[n] ~ dnorm(mu[n], tau_y)
+    mu[n] <- beta0[state[n]] + beta1[state[n]] * Year[n]
+  }
+
+  # State intercepts and slopes
+  for (s in 1:S) {
+    beta0[s] ~ dnorm(mu_beta0, tau_beta0)
+    beta1[s] ~ dnorm(mu_beta1, tau_beta1)
+  }
+
+  # Hyperpriors
+  mu_beta0 ~ dnorm(0, 0.001)
+  sigma_beta0 ~ dunif(0, 50)
+  tau_beta0 <- pow(sigma_beta0, -2)
+
+  mu_beta1 ~ dnorm(0, 0.001)
+  sigma_beta1 ~ dunif(0, 50)
+  tau_beta1 <- pow(sigma_beta1, -2)
+
+
+  sigma_y ~ dunif(0, 100)
+  tau_y <- pow(sigma_y, -2)
+
+}
+"
+params <- c(
+  "beta0",      # state intercepts
+  "beta1",      # state slopes
+  "mu_beta1",   # mean slope
+  "sigma_beta1",
+  "sigma_y"
+)
+
+
+jags_data <- list(
+  Y     = df$HpH,
+  Year  = df$Year,      
+  state = df$state_id,
+  N     = nrow(df),
+  S     = length(unique(df$state_id))
+)
+
+Slope_Inter_Hier_Only <- jags(
+  data = jags_data,
+  inits = inits,
+  parameters.to.save = params,
+  model.file = textConnection(mod_hier_both),
+  n.chains = 3, n.adapt = 5000,
+  n.iter = 101000,
+  n.burnin = 1000, n.thin = 10,
+  parallel = FALSE, DIC = TRUE
+)
+```
+
+
+
+```{r}
+Slope_Inter_Hier_Only
+```
+
+
+
+
+
+
+
+```{r}
+traceplot(Slope_Inter_Hier_Only)
+par(mfrow=c(3,3))
+autocorr.plot(Slope_Inter_Hier_Only$samples,lag.max=40,auto.layout=FALSE,ask=FALSE)
+```
+
+
+# only INtercept
+
+
+```{r}
+mod_hier_intercept <- "
+model {
+
+  # Likelihood
+  for (n in 1:N) {
+    Y[n] ~ dnorm(mu[n], tau_y)
+    mu[n] <- beta0[state[n]] + beta1 * Year[n]
+  }
+
+  # State intercepts
+  for (s in 1:S) {
+    beta0[s] ~ dnorm(mu_beta0, tau_beta0)
+  }
+
+  # Hyperpriors for intercepts
+  mu_beta0 ~ dnorm(0, 0.001)
+  sigma_beta0 ~ dunif(0, 50)
+  tau_beta0 <- pow(sigma_beta0, -2)
+
+  #  slope
+  beta1 ~ dnorm(0, 0.001)
+
+  sigma_y ~ dunif(0, 100)
+  tau_y <- pow(sigma_y, -2)
+
+}
+"
+
+
+params <- c(
+  "beta0",      # stateintercepts
+  "beta1",      #  slope
+  "sigma_y"
+)
+
+jags_data <- list(
+  Y     = df$HpH,
+  Year  = df$Year,        
+  state = df$state_id,    
+  N     = nrow(df),
+  S     = length(unique(df$state_id))
+)
+
+
+
+Only_Inter <- jags(
+  data = jags_data,
+  inits = inits,
+  parameters.to.save = params,
+  model.file = textConnection(mod_hier_intercept),
+  n.chains = 3, n.adapt = 5000,
+  n.iter = 101000,
+  n.burnin = 1000, n.thin = 10,
+  parallel = FALSE, DIC = TRUE
+)
+
+```
+
+
+
+
+```{r}
+Only_Inter
+```
+
+
+
+
+
+
+
+```{r}
+traceplot(Only_Inter)
+par(mfrow=c(3,3))
+autocorr.plot(Only_Inter$samples,lag.max=40,auto.layout=FALSE,ask=FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Only Slope Hier
+
+
+```{r}
+mod_hier <- "
+model {
+
+  # Likelihood
+  for (n in 1:N) {
+    Y[n] ~ dnorm(mu[n], tau_y)
+    mu[n] <- beta0 + beta1[state[n]] * Year[n]
+  }
+
+  # State slopes
+  for (s in 1:S) {
+    beta1[s] ~ dnorm(mu_beta1, tau_beta1)
+  }
+
+  # priors
+  mu_beta1 ~ dnorm(0, 0.001)
+  sigma_beta1 ~ dunif(0, 50)
+  tau_beta1 <- pow(sigma_beta1, -2)
+
+  # intercept
+  beta0 ~ dnorm(0, 0.001)
+
+  sigma_y ~ dunif(0, 100)
+  tau_y <- pow(sigma_y, -2)
+
+}
+"
+params <- c('beta0', 'beta1', 'mu_beta1', 'sigma_beta1')
+
+SLOPE_HIER_Only <- jags(
+  data = jags_data,
+  inits = inits,
+  parameters.to.save = params,
+  model.file = textConnection(mod_hier),
+  n.chains = 3, n.adapt = 5000,
+  n.iter = 101000,
+  n.burnin = 1000, n.thin = 10,
+  parallel = FALSE, DIC = TRUE
+)
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+SLOPE_HIER_Only
+```
+
+
+
+
+
+
+
+```{r}
+traceplot(SLOPE_HIER_Only)
+par(mfrow=c(3,3))
+autocorr.plot(SLOPE_HIER_Only$samples,lag.max=40,auto.layout=FALSE,ask=FALSE)
+```
+
+
+
+
+
+
+
+
+# No Hier
+
+```{r}
+mod <- "
+
+model {
+
+  # Likelihood
+  for (n in 1:N) {
+    Y[n] ~ dnorm(mu[n], tau)
+    mu[n] <- beta0 + beta1 * Year[n]
+  }
+
+  # Priors
+  beta0 ~ dnorm(0, 0.001)
+  beta1 ~ dnorm(0, 0.001)
+
+  sigma ~ dunif(0, 100)
+  tau <- pow(sigma, -2)
+
+}"
+
+
+jags_data <- list(
+  Y    = df$HpH,
+  Year = df$Year,   # must be 1–8
+  N    = nrow(df)
+)
+inits <- NULL
+params <- c('beta0', 'beta1')
+
+
+## Run the Bayesian model using MCMC
+No_Hier <- jags(data = jags_data, inits = inits,
+               parameters.to.save = params,
+               model.file = textConnection(mod),
+               n.chains = 3, n.adapt = 5000,
+               n.iter = 101000,
+               n.burnin = 1000, n.thin = 10,
+               parallel = FALSE, DIC = TRUE)
+```
+
+
+
+
+
+```{r}
+No_Hier
+```
+
+
+
+
+
+
+
+```{r}
+traceplot(No_Hier)
+par(mfrow=c(3,3))
+autocorr.plot(No_Hier$samples,lag.max=40,auto.layout=FALSE,ask=FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Put all model objects into a named list
+model_list <- list(
+  "Full_Fitted_Model_Hier_STSL_Only_No_Inter" = Full_Fitted_Model_Hier_STSL_Only_No_Inter,
+  "Full_Fitted_Model_Hier_SL_Only_No_Inter" = Full_Fitted_Model_Hier_SL_Only_No_Inter,
+  "Full_Fitted_Model_Hier_STSL_Only_with_Inter" = Full_Fitted_Model_Hier_STSL_Only_with_Inter,
+  "Full_Fitted_Model_Hier_STSL_All_Interactions" = Full_Fitted_Model_Hier_STSL_All_Interactions,
+  "Full_Fitted_Model_Hier_Slope_Only" = Full_Fitted_Model_Hier_Slope_Only,
+  "Full_Fitted_Model_Hier_STSL_Only_No_Inter_and_DISEASE" = Full_Fitted_Model_Hier_STSL_Only_No_Inter_and_DISEASE,
+  "Full_Fitted_Model_Hier_All" = Full_Fitted_Model_Hier_All,
+  "Slope_Inter_Hier_Only" = Slope_Inter_Hier_Only,
+  "Only_Inter" = Only_Inter,
+  "SLOPE_HIER_Only" = SLOPE_HIER_Only
+)
+
+# Extract DIC values safely (handles models without DIC)
+dic_values <- sapply(model_list, function(mod) {
+  if (!is.null(mod$DIC)) {
+    return(mod$DIC)
+  } else {
+    return(NA)
+  }
+})
+
+# Create comparison table
+dic_table <- data.frame(
+  Model = names(dic_values),
+  DIC = as.numeric(dic_values)
+)
+
+# Sort by DIC (lowest is best)
+dic_table <- dic_table[order(dic_table$DIC), ]
+
+# Print nicely
+print(dic_table)
+
+# Optional: nicer display in R Markdown
+knitr::kable(dic_table, digits = 3)
+
+```
+
+
+
+
+```{r}
+lme4::lmer(HpH~ (1|State) + Year, data = df)
+```
+
+
+
+
+
+
